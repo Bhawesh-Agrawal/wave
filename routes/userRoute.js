@@ -8,5 +8,6 @@ router.post("/", createUser)
 router.get("/:email", getUserByEmail)
 router.put("/streak/:id", updateStreak);
 router.put("/update", updateUser);
+router.get("/search", searchUsers);
 
 export default router;

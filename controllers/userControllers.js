@@ -155,3 +155,54 @@ export const updateUser = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+export const searchUsers = async (req, res) => {
+  try {
+    // 1. Authenticate the user
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
+      console.error("SearchUsers Error: No token provided");
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { data: authUser, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !authUser.user) {
+        console.error("SearchUsers Error: Invalid token or auth error", authError);
+        return res.status(401).json({ error: "Invalid token" });
+    }
+
+    const currentUserId = authUser.user.id;
+    const { q } = req.query; // Get search query from query params
+
+    // 2. Validate the search query
+    if (!q || typeof q !== 'string' || q.trim().length === 0) {
+      console.log("SearchUsers Info: Missing or empty search query 'q'");
+      return res.status(400).json({ error: "Search query 'q' is required and cannot be empty" });
+    }
+    const searchTerm = q.trim(); // Use trimmed query
+    console.log(`SearchUsers Info: User ${currentUserId} searching for "${searchTerm}"`);
+
+
+    // 3. Perform the search query
+    // Search in 'username' OR 'email' columns using case-insensitive 'ilike'
+    // Exclude the current user using 'neq' (not equal)
+    const { data, error: searchError } = await supabase
+      .from('users')
+      .select('id, username, email, avatar_url') // Select only needed public fields
+      .or(`username.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`) // Case-insensitive search
+      .neq('id', currentUserId) // Exclude the user performing the search
+      .limit(10); // Limit results for performance
+
+    if (searchError) {
+        console.error("SearchUsers Error: Supabase search query failed", searchError);
+        throw searchError; // Let the catch block handle it
+    }
+
+    console.log(`SearchUsers Info: Found ${data.length} users matching "${searchTerm}"`);
+    res.status(200).json(data); // Send back the array of matching users
+
+  } catch (err) {
+    console.error("SearchUsers Error: Unhandled exception", err.message);
+    res.status(500).json({ error: err.message || "An internal server error occurred" });
+  }
+};
