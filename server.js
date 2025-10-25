@@ -24,7 +24,7 @@ app.get("/", (req, res) => res.send("Wave backend running 🌊"));
 
 app.use("/api/users", userRoute);
 app.use("/api/polls", pollRoute);
-app.use("/api/mesaages", messageRoute);
+app.use("/api/messages", messageRoute);
 app.use("/api/groups", groupRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/uploads", uploadRoutes);
