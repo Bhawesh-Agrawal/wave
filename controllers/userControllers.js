@@ -198,6 +198,13 @@ export const searchUsers = async (req, res) => {
         throw searchError; // Let the catch block handle it
     }
 
+    // --- ADD THESE LOGS ---
+    console.log(`SearchUsers Info: Supabase returned ${data ? data.length : 'null/undefined'} results.`);
+    console.log('SearchUsers Info: Type of data:', typeof data);
+    console.log('SearchUsers Info: Is data an array?', Array.isArray(data));
+    console.log('SearchUsers Info: Data:', JSON.stringify(data, null, 2)); // Log the actual data
+    // --- END LOGS ---
+
     console.log(`SearchUsers Info: Found ${data.length} users matching "${searchTerm}"`);
     res.status(200).json(data); // Send back the array of matching users
 
