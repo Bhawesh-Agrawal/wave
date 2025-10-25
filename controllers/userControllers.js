@@ -121,3 +121,37 @@ export const updateStreak = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+export const updateUser = async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "Unauthorized" });
+
+    const { data: authUser, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !authUser.user) throw authError;
+
+    // --- THIS IS THE CHANGE ---
+    // Get all fields that can be updated
+    const { bio, funny_tags, avatar_url } = req.body;
+
+    // Build an object with only the fields that were provided
+    const updates = {};
+    if (bio !== undefined) updates.bio = bio;
+    if (funny_tags !== undefined) updates.funny_tags = funny_tags;
+    if (avatar_url !== undefined) updates.avatar_url = avatar_url;
+    // --- END OF CHANGE ---
+
+    const { data, error } = await supabase
+      .from("users")
+      .update(updates) // Update only the provided fields
+      .eq("id", authUser.user.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.status(200).json({ message: "User updated", user: data });
+  } catch (err) {
+    console.error("Error updating user:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+};

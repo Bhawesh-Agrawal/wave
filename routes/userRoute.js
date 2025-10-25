@@ -7,6 +7,6 @@ const router = express.Router()
 router.post("/", createUser)
 router.get("/:email", getUserByEmail)
 router.put("/streak/:id", updateStreak);
-router.put("/", updateUser);
+router.put("/update", updateUser);
 
 export default router;
