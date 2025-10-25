@@ -39,6 +39,11 @@ export const getUserGroups = async (req, res) => {
       `)
       .eq("user_id", user_id);
 
+    if (!data) {
+        console.log("Backend: No group membership data found for user, returning empty array.");
+        return res.status(200).json([]); // Return empty array if user is in 0 groups
+    }
+
     if (error) throw error;
     const groups = data.map(item => item.group_id);
     res.status(200).json(groups);
