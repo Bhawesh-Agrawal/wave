@@ -24,3 +24,29 @@ export const uploadFile = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+export const updateUser = async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "Unauthorized" });
+
+    const { data: authUser, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !authUser.user) throw authError;
+
+    // Get the fields to update from the body
+    const { bio, funny_tags } = req.body;
+
+    const { data, error } = await supabase
+      .from("users")
+      .update({ bio, funny_tags }) // Only update these fields
+      .eq("id", authUser.user.id)
+      .select()
+      .single(); // Use .single() to get one object back
+
+    if (error) throw error;
+    res.status(200).json({ message: "User updated", user: data });
+  } catch (err) {
+    console.error("Error updating user:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
