@@ -188,10 +188,11 @@ export const searchUsers = async (req, res) => {
     // Exclude the current user using 'neq' (not equal)
     const { data, error: searchError } = await supabase
       .from('users')
-      .select('id, username, email, avatar_url') // Select only needed public fields
-      .or(`username.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`) // Case-insensitive search
-      .neq('id', currentUserId) // Exclude the user performing the search
-      .limit(10); // Limit results for performance
+      .select('id, username, email, avatar_url')
+      .or(`username.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
+      .neq('id', currentUserId)
+      .limit(10);
+
 
     if (searchError) {
         console.error("SearchUsers Error: Supabase search query failed", searchError);
