@@ -1,13 +1,12 @@
 import { supabase } from "../config/supabaseClient.js";
 
-
 export const createPoll = async (req, res) => {
   try {
-    const { creator_id, question, options } = req.body;
+    const { creator_id, group_id, question, options } = req.body; // Add group_id
 
     const { data, error } = await supabase
       .from("polls")
-      .insert([{ creator_id, question, options }])
+      .insert([{ creator_id, group_id, question, options }]) // Include group_id
       .select();
 
     if (error) throw error;
@@ -18,13 +17,20 @@ export const createPoll = async (req, res) => {
   }
 };
 
-// 📊 Get all polls
 export const getPolls = async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const { group_id } = req.query; // Get from query params
+    
+    let query = supabase
       .from("polls")
       .select("*, users(username, avatar_url)")
       .order("created_at", { ascending: false });
+    
+    if (group_id) {
+      query = query.eq("group_id", group_id);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
     res.status(200).json(data);
