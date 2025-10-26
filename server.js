@@ -8,6 +8,7 @@ import messageRoute from "./routes/messageRoute.js"
 import groupRoutes from "./routes/groupRoute.js";
 import expenseRoutes from "./routes/expenseRoute.js";
 import uploadRoutes from "./routes/uploadRoute.js";
+import suggestionRoutes from "./routes/suggestionRoutes.js";
 
 
 
@@ -28,6 +29,7 @@ app.use("/api/messages", messageRoute);
 app.use("/api/groups", groupRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/uploads", uploadRoutes);
+app.use("/api/suggestions", suggestionRoutes);
 
 
 app.listen(process.env.PORT, () =>
