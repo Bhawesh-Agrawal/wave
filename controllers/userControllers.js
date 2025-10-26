@@ -186,12 +186,23 @@ export const searchUsers = async (req, res) => {
     // 3. Perform the search query
     // Search in 'username' OR 'email' columns using case-insensitive 'ilike'
     // Exclude the current user using 'neq' (not equal)
-    const { data, error: searchError } = await supabase
-      .from('users')
-      .select('id, username, email, avatar_url')
-      .or(`username.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
-      .neq('id', currentUserId)
-      .limit(10);
+    // Use two separate queries and merge manually
+    const [usernameRes, emailRes] = await Promise.all([
+        supabase.from('users')
+          .select('id, username, email, avatar_url')
+          .ilike('username', `%${searchTerm}%`)
+          .neq('id', currentUserId)
+          .limit(10),
+        supabase.from('users')
+          .select('id, username, email, avatar_url')
+          .ilike('email', `%${searchTerm}%`)
+          .neq('id', currentUserId)
+          .limit(10)
+      ]);
+
+    const data = [...(usernameRes.data || []), ...(emailRes.data || [])];
+    // Remove duplicates
+    const unique = Array.from(new Map(data.map(u => [u.id, u])).values());
 
 
     if (searchError) {
