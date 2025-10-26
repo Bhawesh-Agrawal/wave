@@ -1,4 +1,4 @@
-// userController.js
+// controllers/userController.js
 import { supabase } from "../config/supabaseClient.js";
 
 /**
@@ -7,27 +7,26 @@ import { supabase } from "../config/supabaseClient.js";
  */
 export const createUser = async (req, res) => {
   try {
-    // Extract Supabase token from Authorization header
     const token = req.headers.authorization?.split(" ")[1];
     if (!token) return res.status(401).json({ error: "Unauthorized" });
 
     const { data: authUser, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !authUser.user) throw authError || new Error("Invalid token");
+    if (authError || !authUser?.user)
+      return res.status(401).json({ error: "Invalid token" });
 
     const { username, avatar_url, bio, funny_tags } = req.body;
 
-    // Check if user already exists in users table
+    // Check if user already exists
     const { data: existingUser } = await supabase
       .from("users")
       .select("*")
       .eq("id", authUser.user.id)
-      .single();
+      .maybeSingle();
 
     if (existingUser) {
       return res.status(200).json({ message: "User already exists", user: existingUser });
     }
 
-    // Insert new user using Supabase Auth ID
     const { data, error } = await supabase
       .from("users")
       .insert([
@@ -40,19 +39,20 @@ export const createUser = async (req, res) => {
           funny_tags,
         },
       ])
-      .select();
+      .select()
+      .maybeSingle();
 
     if (error) throw error;
-    res.status(201).json({ message: "User Created", user: data[0] });
+
+    res.status(201).json({ message: "User created", user: data });
   } catch (err) {
-    console.error("Error creating user:", err.message);
+    console.error("❌ Error creating user:", err.message);
     res.status(500).json({ error: err.message });
   }
 };
 
 /**
  * Get a user by email.
- * Requires authentication via Supabase token.
  */
 export const getUserByEmail = async (req, res) => {
   try {
@@ -60,26 +60,29 @@ export const getUserByEmail = async (req, res) => {
     if (!token) return res.status(401).json({ error: "Unauthorized" });
 
     const { data: authUser, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !authUser.user) throw authError || new Error("Invalid token");
+    if (authError || !authUser?.user)
+      return res.status(401).json({ error: "Invalid token" });
 
     const { email } = req.params;
+
     const { data, error } = await supabase
       .from("users")
       .select("*")
       .eq("email", email)
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
+    if (!data) return res.status(404).json({ error: "User not found" });
+
     res.status(200).json(data);
   } catch (err) {
-    console.error("Error fetching user:", err.message);
+    console.error("❌ Error fetching user:", err.message);
     res.status(500).json({ error: err.message });
   }
 };
 
 /**
- * Update the user's streak.
- * Requires authentication via Supabase token.
+ * Update user streak.
  */
 export const updateStreak = async (req, res) => {
   try {
@@ -87,141 +90,122 @@ export const updateStreak = async (req, res) => {
     if (!token) return res.status(401).json({ error: "Unauthorized" });
 
     const { data: authUser, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !authUser.user) throw authError || new Error("Invalid token");
+    if (authError || !authUser?.user)
+      return res.status(401).json({ error: "Invalid token" });
 
     const today = new Date().toISOString().split("T")[0];
 
-    // Fetch user's current streak
     const { data: user, error: userError } = await supabase
       .from("users")
       .select("streak_count, last_meetup_date")
       .eq("id", authUser.user.id)
-      .single();
+      .maybeSingle();
 
     if (userError) throw userError;
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     let newCount = user.streak_count || 0;
+    if (user.last_meetup_date !== today) newCount += 1;
 
-    // Only increment streak if last_meetup_date is not today
-    if (user.last_meetup_date !== today) {
-      newCount += 1;
-    }
-
-    // Update the user's streak
     const { data, error } = await supabase
       .from("users")
       .update({ streak_count: newCount, last_meetup_date: today })
       .eq("id", authUser.user.id)
-      .select();
+      .select()
+      .maybeSingle();
 
     if (error) throw error;
-    res.status(200).json({ message: "Streak updated", user: data[0] });
+    res.status(200).json({ message: "Streak updated", user: data });
   } catch (err) {
-    console.error("Error updating streak:", err.message);
+    console.error("❌ Error updating streak:", err.message);
     res.status(500).json({ error: err.message });
   }
 };
 
+/**
+ * Update user profile (bio, avatar, funny_tags).
+ */
 export const updateUser = async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
     if (!token) return res.status(401).json({ error: "Unauthorized" });
 
     const { data: authUser, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !authUser.user) throw authError;
+    if (authError || !authUser?.user)
+      return res.status(401).json({ error: "Invalid token" });
 
-    // --- THIS IS THE CHANGE ---
-    // Get all fields that can be updated
     const { bio, funny_tags, avatar_url } = req.body;
-
-    // Build an object with only the fields that were provided
     const updates = {};
     if (bio !== undefined) updates.bio = bio;
     if (funny_tags !== undefined) updates.funny_tags = funny_tags;
     if (avatar_url !== undefined) updates.avatar_url = avatar_url;
-    // --- END OF CHANGE ---
 
     const { data, error } = await supabase
       .from("users")
-      .update(updates) // Update only the provided fields
+      .update(updates)
       .eq("id", authUser.user.id)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
+    if (!data) return res.status(404).json({ error: "User not found" });
+
     res.status(200).json({ message: "User updated", user: data });
   } catch (err) {
-    console.error("Error updating user:", err.message);
+    console.error("❌ Error updating user:", err.message);
     res.status(500).json({ error: err.message });
   }
 };
 
+/**
+ * Search users by username or email.
+ * FIXED: Removed .single() and .maybeSingle() calls that caused the error
+ */
 export const searchUsers = async (req, res) => {
   try {
-    // 1. Authenticate the user
     const token = req.headers.authorization?.split(" ")[1];
-    if (!token) {
-      console.error("SearchUsers Error: No token provided");
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    if (!token) return res.status(401).json({ error: "Unauthorized" });
 
     const { data: authUser, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !authUser.user) {
-        console.error("SearchUsers Error: Invalid token or auth error", authError);
-        return res.status(401).json({ error: "Invalid token" });
-    }
+    if (authError || !authUser?.user)
+      return res.status(401).json({ error: "Invalid token" });
 
     const currentUserId = authUser.user.id;
-    const { q } = req.query; // Get search query from query params
+    const { q } = req.query;
 
-    // 2. Validate the search query
-    if (!q || typeof q !== 'string' || q.trim().length === 0) {
-      console.log("SearchUsers Info: Missing or empty search query 'q'");
-      return res.status(400).json({ error: "Search query 'q' is required and cannot be empty" });
+    if (!q || typeof q !== "string" || q.trim().length === 0) {
+      return res.status(400).json({ error: "Search query 'q' is required" });
     }
-    const searchTerm = q.trim(); // Use trimmed query
-    console.log(`SearchUsers Info: User ${currentUserId} searching for "${searchTerm}"`);
 
+    const searchTerm = q.trim();
 
-    // 3. Perform the search query
-    // Search in 'username' OR 'email' columns using case-insensitive 'ilike'
-    // Exclude the current user using 'neq' (not equal)
-    // Use two separate queries and merge manually
+    // FIXED: Remove .single() or .maybeSingle() - these queries return arrays
     const [usernameRes, emailRes] = await Promise.all([
-        supabase.from('users')
-          .select('id, username, email, avatar_url')
-          .ilike('username', `%${searchTerm}%`)
-          .neq('id', currentUserId)
-          .limit(10),
-        supabase.from('users')
-          .select('id, username, email, avatar_url')
-          .ilike('email', `%${searchTerm}%`)
-          .neq('id', currentUserId)
-          .limit(10)
-      ]);
+      supabase
+        .from("users")
+        .select("id, username, email, avatar_url")
+        .ilike("username", `%${searchTerm}%`)
+        .neq("id", currentUserId)
+        .limit(10),
+      supabase
+        .from("users")
+        .select("id, username, email, avatar_url")
+        .ilike("email", `%${searchTerm}%`)
+        .neq("id", currentUserId)
+        .limit(10),
+    ]);
 
-    const data = [...(usernameRes.data || []), ...(emailRes.data || [])];
-    // Remove duplicates
-    const unique = Array.from(new Map(data.map(u => [u.id, u])).values());
+    if (usernameRes.error) throw usernameRes.error;
+    if (emailRes.error) throw emailRes.error;
 
+    // Combine and deduplicate results
+    const combined = [...(usernameRes.data || []), ...(emailRes.data || [])];
+    const unique = Array.from(new Map(combined.map(u => [u.id, u])).values());
 
-    if (searchError) {
-        console.error("SearchUsers Error: Supabase search query failed", searchError);
-        throw searchError; // Let the catch block handle it
-    }
-
-    // --- ADD THESE LOGS ---
-    console.log(`SearchUsers Info: Supabase returned ${data ? data.length : 'null/undefined'} results.`);
-    console.log('SearchUsers Info: Type of data:', typeof data);
-    console.log('SearchUsers Info: Is data an array?', Array.isArray(data));
-    console.log('SearchUsers Info: Data:', JSON.stringify(data, null, 2)); // Log the actual data
-    // --- END LOGS ---
-
-    console.log(`SearchUsers Info: Found ${data.length} users matching "${searchTerm}"`);
-    res.status(200).json(data); // Send back the array of matching users
-
+    // Return empty array if no results, not a 404
+    res.status(200).json(unique);
   } catch (err) {
-    console.error("SearchUsers Error: Unhandled exception", err.message);
-    res.status(500).json({ error: err.message || "An internal server error occurred" });
+    console.error("❌ searchUsers: Unhandled exception:", err.message);
+    res.status(500).json({ error: err.message || "Internal server error" });
   }
 };
