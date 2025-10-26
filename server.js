@@ -8,7 +8,7 @@ import messageRoute from "./routes/messageRoute.js"
 import groupRoutes from "./routes/groupRoute.js";
 import expenseRoutes from "./routes/expenseRoute.js";
 import uploadRoutes from "./routes/uploadRoute.js";
-import suggestionRoutes from "./routes/suggestionRoutes.js";
+import suggestionRoutes from "./routes/suggestionRoute.js";
 
 
 
