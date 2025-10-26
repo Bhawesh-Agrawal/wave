@@ -9,27 +9,60 @@ export const createSuggestion = async (req, res) => {
       return res.status(400).json({ error: "group_id is required" });
     }
 
-    // For now, just use the prompt as content
-    // You can add Gemini API integration later
-    const suggestionText = `Suggestion: ${prompt}`;
-    
-    // Optional: Maps API integration
+    let suggestionText = `Based on "${prompt}"...`;
     let bestLocation = null;
     let lat = null;
     let lng = null;
-    
+
+    // 1️⃣ Try Google Gemini AI (Free tier available)
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const geminiResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{
+                  text: `You are a helpful assistant suggesting fun hangout ideas. Based on this request: "${prompt}", suggest 2-3 specific places or activities with brief descriptions. Keep it casual and fun. Format: "How about [place/activity]? [1-2 sentence description]"`
+                }]
+              }]
+            })
+          }
+        );
+
+        const geminiData = await geminiResponse.json();
+        if (geminiData.candidates && geminiData.candidates[0]) {
+          suggestionText = geminiData.candidates[0].content.parts[0].text;
+        }
+      } catch (geminiError) {
+        console.error("Gemini API error:", geminiError);
+        // Fallback to default
+        suggestionText = `Here's an idea based on "${prompt}": Find a cozy spot nearby that matches your vibe! Check out local cafes, parks, or activity centers in your area.`;
+      }
+    } else {
+      // Fallback suggestions without AI
+      suggestionText = `Here's an idea for "${prompt}": Check out local spots in your area that match this vibe!`;
+    }
+
+    // 2️⃣ Get location suggestions (if Maps API is available)
     if (locations && locations.length > 0 && process.env.MAPS_API_KEY) {
       try {
-        const mapsResponse = await fetch(
-          `https://maps.googleapis.com/maps/api/geocode/json?latlng=${locations[0].lat},${locations[0].lng}&key=${process.env.MAPS_API_KEY}`
+        // Use Places API to find nearby spots
+        const placesResponse = await fetch(
+          `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${locations[0].lat},${locations[0].lng}&radius=5000&type=cafe|restaurant|park&key=${process.env.MAPS_API_KEY}`
         );
-        const mapsData = await mapsResponse.json();
-        bestLocation = mapsData.results[0]?.formatted_address || null;
-        lat = locations[0].lat;
-        lng = locations[0].lng;
+        const placesData = await placesResponse.json();
+        
+        if (placesData.results && placesData.results.length > 0) {
+          const topPlace = placesData.results[0];
+          bestLocation = topPlace.name + " - " + topPlace.vicinity;
+          lat = topPlace.geometry.location.lat;
+          lng = topPlace.geometry.location.lng;
+        }
       } catch (mapError) {
         console.error("Maps API error:", mapError);
-        // Continue without location data
       }
     }
 
@@ -43,7 +76,13 @@ export const createSuggestion = async (req, res) => {
         lat, 
         lng 
       }])
-      .select();
+      .select(`
+        *,
+        users:creator_id (
+          username,
+          avatar_url
+        )
+      `);
 
     if (error) throw error;
     res.status(201).json({ message: "Suggestion created", suggestion: data[0] });
